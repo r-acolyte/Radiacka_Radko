@@ -1,0 +1,175 @@
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(zoo)
+library(data.table)
+```
+
+```{r}
+faktor_Q<-read.table(file="C:/Users/Daniel Truchan/Desktop/Radiačná fyzika zadanie/faktorQ.dat",sep="")
+Po_214<-read.table(file="C:/Users/Daniel Truchan/Desktop/Radiačná fyzika zadanie/LINEAL214.dat", sep="")
+Po_218<- read.table(file="C:/Users/Daniel Truchan/Desktop/Radiačná fyzika zadanie/LINEAL218.dat", sep="")
+
+Po_214<-subset.data.frame(Po_214,select=c(T,T,F,F,T,T,F,T))
+Po_218<-subset.data.frame(Po_218,select=c(T,T,F,F,T,T,F,T))
+
+colnames(faktor_Q) <-c("y", "Q")
+colnames(Po_214) <-c("y", "f(y)","S.c.","h","Q")
+colnames(Po_218) <-c("y", "f(y)","S.c.","h","Q")
+
+faktor_Q
+Po_214
+Po_218
+mPo_214<-filter(Po_214,S.c.==10)
+mPo_218<-filter(Po_218,S.c.==10)
+m1Po_218<-mPo_218[1:900,]
+m2Po_218<-mPo_218[901:1800,]
+mPo_214
+m1Po_218
+m2Po_218
+```
+
+```{r}
+ggplot() +
+  geom_point(mapping = aes(x = faktor_Q[,"y"], y = faktor_Q[,"Q"]),color="green") +
+  geom_line(mapping = aes(x = faktor_Q[,"y"], y = faktor_Q[,"Q"]),color="darkgreen") +
+  geom_point(mapping = aes(x = mPo_214[,"y"], y = mPo_214[,"Q"]), color="red") +
+  geom_point(mapping = aes(x = m1Po_218[,"y"], y = m1Po_218[,"Q"]), color="blue") +
+  geom_line(mapping = aes(x = m2Po_218[,"y"], y = m2Po_218[,"Q"]), color="black") 
+```
+
+```{r}
+mPo_214$y<-na.spline(mPo_214$y)
+mPo_214$Q<-na.locf(mPo_214$Q)
+mPo_214[,"f(y)"]<-na.spline(mPo_214[,"f(y)"])
+mPo_214
+```
+
+```{r}
+m1Po_218$y<-na.spline(m1Po_218$y)
+m1Po_218$Q<-na.locf(m1Po_218$Q)
+m1Po_218[,"f(y)"]<-na.spline(m1Po_218[,"f(y)"])
+m1Po_218
+```
+```{r}
+m2Po_218$y<-na.spline(m2Po_218$y)
+m2Po_218$Q<-na.locf(m2Po_218$Q)
+m2Po_218[,"f(y)"]<-na.spline(m2Po_218[,"f(y)"])
+m2Po_218
+```
+
+```{r}
+int_faktor_Q<-approx(faktor_Q[,"y"],faktor_Q[,"Q"],mPo_214[,"y"]+faktor_Q[,"y"])
+int_Po_214<-approx(mPo_214[,"y"],mPo_214[,"Q"],mPo_214[,"y"]+faktor_Q[,"y"])
+int_Po_218<-approx(m1Po_218[,"y"],m1Po_218[,"Q"],m1Po_218[,"y"]+faktor_Q[,"y"])
+int2_Po_218<-approx(m2Po_218[,"y"],m2Po_218[,"Q"],m2Po_218[,"y"]+faktor_Q[,"y"])
+tabulka<-data.frame(int_faktor_Q$x,int_Po_214$x,int_Po_218$x,int2_Po_218$x, int_faktor_Q$y,int_Po_214$y, int_Po_218$y, int2_Po_218$y)
+tabulka
+tabulka$int_Po_214.y<-na.locf(tabulka$int_Po_214.y)
+tabulka$int_Po_218.y<-na.locf(tabulka$int_Po_218.y)
+tabulka$int2_Po_218.y<-na.locf(tabulka$int2_Po_218.y)
+tabulka$int_faktor_Q.y<-na.locf(tabulka$int_faktor_Q.y)
+colnames(tabulka) <-c("y1", "y2","y3","y4","Q","Q214","Q218a","Q218b")
+tabulka
+```
+
+
+```{r}
+tab_214<-data.frame(tabulka$y1,mPo_214[,"f(y)"],tabulka$Q,tabulka$Q214,mPo_214[,"h"],mPo_214[,"S.c."])
+tab_218a<-data.frame(tabulka$y1,m1Po_218[,"f(y)"],tabulka$Q,tabulka$Q218a,m1Po_218[,"h"],m1Po_218[,"S.c."])
+tab_218b<-data.frame(tabulka$y1,m2Po_218[,"f(y)"],tabulka$Q,tabulka$Q218b,m2Po_218[,"h"],m2Po_218[,"S.c."])
+colnames(tab_214) <-c("y1", "fy","Q","Q214","h","S.c.")
+colnames(tab_218a) <-c("y1", "fy","Q","Q218a","h","S.c.")
+colnames(tab_218b) <-c("y1", "fy","Q","Q218b","h","S.c.")
+tab_214<-arrange(tab_214,h,y1)
+tab_218a<-arrange(tab_218a,h,y1)
+tab_218b<-arrange(tab_218b,h,y1)
+tab_214
+tab_218a
+tab_218b
+```
+
+
+```{r}
+tab_214 %>% group_by(h) %>%
+  mutate(dy = y1 - lag(y1))
+sumaodh_214<-transmute(tab_214,prispevok=y1*fy*Q*dy,tab_214$h)
+norma214<-transmute(tab_214,prispevok=y1*fy*dy,tab_214$h)
+
+sumaodh_214
+norma214
+
+tab_218a %>% group_by(h) %>%
+  mutate(dy = y1 - lag(y1))
+sumaodh_218a<-transmute(tab_218a,prispevok=y1*fy*Q*dy,tab_218a$h)
+norma218a<-transmute(tab_218a,prispevok=y1*fy*dy,tab_218a$h)
+
+sumaodh_218a
+norma218a
+
+tab_218b %>% group_by(h) %>%
+  mutate(dy = y1 - lag(y1))
+sumaodh_218b<-transmute(tab_218b,prispevok=y1*fy*Q*dy,tab_218b$h)
+norma218b<-transmute(tab_218b,prispevok=y1*fy*dy,tab_218b$h)
+
+sumaodh_218b
+norma218b
+```
+
+
+```{r}
+qodh214<- data.table(sumaodh_214)
+qodh214 <-qodh214[,list(prispevok=sum(prispevok)), by=tab_214$h]
+colnames(qodh214)<-c("h", "prispevok")
+qodh214
+Nqodh214 <- data.table(norma214)
+Nqodh214 <-Nqodh214[,list(prispevok=sum(prispevok)), by=tab_214$h]
+colnames(Nqodh214)<-c("h", "prispevok")
+Nqodh214
+
+qodh218a<- data.table(sumaodh_218a)
+qodh218a <-qodh218a[,list(prispevok=sum(prispevok)), by=tab_218a$h]
+colnames(qodh218a)<-c("h", "prispevok")
+qodh218a
+Nqodh218a <- data.table(norma218a)
+Nqodh218a <-Nqodh218a[,list(prispevok=sum(prispevok)), by=tab_218a$h]
+colnames(Nqodh218a)<-c("h", "prispevok")
+Nqodh218a
+
+qodh218b<- data.table(sumaodh_218b)
+qodh218b <-qodh218b[,list(prispevok=sum(prispevok)), by=tab_218b$h]
+colnames(qodh218b)<-c("h", "prispevok")
+qodh218b
+Nqodh218b <- data.table(norma218b)
+Nqodh218b <-Nqodh218b[,list(prispevok=sum(prispevok)), by=tab_218b$h]
+colnames(Nqodh218b)<-c("h", "prispevok")
+Nqodh218b
+```
+```{r}
+strQih214<-transmute(Nqodh214,Q=qodh214$prispevok/Nqodh214$prispevok,h=Nqodh214$h)
+strQih214
+
+strQih218a<-transmute(Nqodh218a,Q=qodh218a$prispevok/Nqodh218a$prispevok,h=Nqodh218a$h)
+strQih218a
+
+strQih218b<-transmute(Nqodh218b,Q=qodh218b$prispevok/Nqodh218b$prispevok,h=Nqodh218b$h)
+strQih218b
+```
+
+
+```{r}
+ggplot() +
+  geom_line(mapping = aes(x = strQih214[,"h"], y = strQih214[,"Q"]),color="darkgreen") +
+  geom_point(mapping = aes(x = strQih214[,"h"], y = strQih214[,"Q"]),color="green") +
+  
+  geom_line(mapping = aes(x = strQih218a[,"h"], y = strQih218a[,"Q"]),color="darkred") +
+  geom_point(mapping = aes(x = strQih218a[,"h"], y = strQih218a[,"Q"]),color="red") +
+  
+  geom_line(mapping = aes(x = strQih218b[,"h"], y = strQih218b[,"Q"]),color="darkblue") +
+  geom_point(mapping = aes(x = strQih218b[,"h"], y = strQih218b[,"Q"]),color="blue") 
+
+```
+
